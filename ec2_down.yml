@@ -1,0 +1,72 @@
+---
+- hosts: localhost
+  vars:
+    - ami_id: "ami-00aa4671cbf840d82"
+    - ec2_count: 0
+    - proxy_sg_name: "proxy_sec_group"
+
+  tasks:
+
+    - name: Provision a set of proxy instances
+      ec2:
+        region: "{{ region }}"
+        aws_access_key: "{{ec2_access_key}}"
+        aws_secret_key: "{{ec2_secret_key}}"
+        key_name: private
+        assign_public_ip: yes
+        group: "{{ proxy_sg_name }}"
+        instance_type: t2.micro
+        image: "{{ ami_id }}"
+        wait: true
+        exact_count: "{{ec2_count}}"
+        count_tag:
+          Name: proxy
+        instance_tags:
+          Name: proxy
+      register: ec2_proxy
+
+    - name: Provision a set of appserver instances
+      ec2:
+        region: "{{ region }}"
+        aws_access_key: "{{ec2_access_key}}"
+        aws_secret_key: "{{ec2_secret_key}}"
+        key_name: private
+        assign_public_ip: no
+        group: "{{ proxy_sg_name }}"
+        instance_type: t2.micro
+        image: "{{ ami_id }}"
+        wait: true
+        exact_count: "{{ec2_count}}"
+        count_tag:
+          Name: appserver
+        instance_tags:
+          Name: appserver
+      register: ec2_appserver
+
+    - name: create sec_group for proxy
+      ec2_group:
+        name: "{{ proxy_sg_name }}"
+        state: absent
+        description: sg with rule descriptions
+        vpc_id: "{{ vpc_id }}"
+        region: "{{ region }}"
+        tags:
+          Name: "{{ proxy_sg_name }}"
+
+    - name: public subnet
+      ec2_vpc_subnet:
+        state: absent
+        region: "{{region}}"
+        vpc_id: "{{ vpc_id }}"
+        cidr: 172.31.1.0/24
+        resource_tags:
+          Name: public subnet
+    
+    - name: private subnet
+      ec2_vpc_subnet:
+        state: absent
+        region: "{{region}}"
+        vpc_id: "{{ vpc_id }}"
+        cidr: 172.31.10.0/24
+        resource_tags:
+          Name: private subnet

@@ -1,0 +1,2 @@
+temp_dir: "{{ ansible_env.HOME }}/tmp/"
+wildfly_dir: "{{ ansible_env.HOME }}/wildfly/"

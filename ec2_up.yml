@@ -1,0 +1,125 @@
+---
+- hosts: localhost
+  vars:
+    - ami_id: "ami-00aa4671cbf840d82"
+    - ec2_count: "{{count | default(2)}}"
+    - proxy_sg_name: "proxy_sec_group"
+    
+  tasks:
+    - name: get own ip
+      uri:
+        url: "http://ipinfo.io/ip"
+        return_content: yes
+        status_code: 200
+      register: own_ip
+
+    - name: public subnet
+      ec2_vpc_subnet:
+        state: present
+        region: "{{region}}"
+        vpc_id: "{{ vpc_id }}"
+        cidr: 172.31.1.0/24
+        resource_tags:
+          Name: public subnet
+      register: public_subnet
+
+    - name: create sec_group for proxy
+      ec2_group:
+        name: "{{ proxy_sg_name }}"
+        description: sg with rule descriptions
+        vpc_id: "{{ vpc_id }}"
+        region: "{{ region }}"
+        tags:
+          Name: "{{ proxy_sg_name }}"
+        rules:
+          - proto: tcp
+            ports:
+            - 80
+            - 443
+            - 22
+            cidr_ip: "{{own_ip.content}}/32"
+            rule_desc: allow only own ip on 80 and 22
+
+    - name: Provision a set of proxy instances
+      ec2:
+        region: "{{ region }}"
+        aws_access_key: "{{ec2_access_key}}"
+        aws_secret_key: "{{ec2_secret_key}}"
+        key_name: private
+        assign_public_ip: yes
+        group: "{{ proxy_sg_name }}"
+        instance_type: t2.micro
+        image: "{{ ami_id }}"
+        wait: true
+        exact_count: "{{ec2_count}}"
+        vpc_subnet_id: "{{ public_subnet.subnet.id }}"
+        count_tag:
+          Name: proxy
+        instance_tags:
+          Name: proxy
+      register: ec2_proxy
+
+    - name: Add all instance public IPs to host group
+      add_host: hostname={{ item.public_ip }} groups=ec2
+      loop: "{{ ec2_proxy.instances }}"
+    
+    - name: private subnet
+      ec2_vpc_subnet:
+        state: present
+        region: "{{region}}"
+        vpc_id: "{{ vpc_id }}"
+        cidr: 172.31.10.0/24
+        resource_tags:
+          Name: private subnet
+      register: private_subnet
+
+    - name: create sec_group for appserver
+      ec2_group:
+        name: "{{ proxy_sg_name }}"
+        description: sg with rule descriptions
+        vpc_id: "{{ vpc_id }}"
+        region: "{{ region }}"
+        tags:
+          Name: "{{ proxy_sg_name }}"
+        rules:
+          - proto: tcp
+            ports:
+            - 443
+            - 80
+            cidr_ip: "172.31.1.0/24"
+            rule_desc: allow 80 and 443
+          - proto: tcp
+            ports:
+            - 22
+            cidr_ip: "172.31.1.0/24"
+            rule_desc: allow 80 and 443
+
+    - name: Provision a set of appserver instances
+      ec2:
+        region: "{{ region }}"
+        aws_access_key: "{{ec2_access_key}}"
+        aws_secret_key: "{{ec2_secret_key}}"
+        key_name: private
+        assign_public_ip: no
+        group: "{{ proxy_sg_name }}"
+        instance_type: t2.micro
+        image: "{{ ami_id }}"
+        wait: true
+        exact_count: "{{ec2_count}}"
+        vpc_subnet_id: "{{ private_subnet.subnet.id }}"
+        count_tag:
+          Name: appserver
+        instance_tags:
+          Name: appserver
+      register: ec2_appserver
+
+    - name: Add all instance public IPs to host group
+      add_host: hostname={{ item.public_ip }} groups=ec2
+      loop: "{{ ec2_appserver.instances }}"
+
+    - name: wait for instances to be running
+      wait_for:
+        host: "{{ item.public_ip }}"
+        port: 22
+        timeout: 20
+      loop: "{{ ec2_proxy.instances + ec2_appserver.instances }}"

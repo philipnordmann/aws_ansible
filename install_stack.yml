@@ -1,0 +1,7 @@
+- hosts: tag_Name_proxy
+  roles:
+    - nginx
+
+- hosts: tag_Name_appserver
+  roles:
+    - wildfly

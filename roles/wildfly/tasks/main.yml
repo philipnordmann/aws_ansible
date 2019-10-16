@@ -1,0 +1,34 @@
+---
+- block:
+  - name: upgrade all packages
+    yum:
+      name: '*'
+      state: latest
+      update_cache: yes
+
+  - name: install java
+    yum:
+      name: java-11-openjdk
+      state: latest
+      update_cache: yes
+  become: yes
+
+- name: create tmp directory
+  file:
+    path: "{{ temp_dir }}"
+    state: directory
+
+- name: create tmp directory
+  file:
+    path: "{{ wildfly_dir }}"
+    state: directory
+
+- name: get wildfly
+  get_url:
+    url: https://download.jboss.org/wildfly/18.0.0.Final/wildfly-18.0.0.Final.tar.gz
+    dest: "{{ temp_dir }}/wildfly.tar.gz"
+
+- name:
+  unarchive:
+    src: "{{ temp_dir }}/wildfly.tar.gz"
+    dest: "{{ wildfly_dir }}"
