@@ -20,4 +20,4 @@ Maybe create an awsrc and source it in.
 In the root there are 3 different playbooks. 
 - **ec2_up.yml**: Will install 2 webserver and 2 application server instances. Also it will install some security groups and subnets.
 - **ec2_down.yml**: Will remove everything from ec2_up.yml.
-- **install_stack.yml**: Will install nginx to the webserver instances and wildfly to the application server instances.
+- **install_stack.yml**: Will install nginx to the webserver instances and wildfly to the application server instances. 
